@@ -1022,19 +1022,18 @@ def usb_serial(package, port, connect_delay, flow_control, packet_receipt_notifi
     do_serial(package, port, connect_delay, flow_control, packet_receipt_notification, baud_rate, serial_number, False,
               timeout)
 
-@dfu.command(short_help='Update the firmware on a device over a USB serial connection. The DFU '
-                        'target must be a chip with USB pins (i.e. nRF52840) and provide a USB ACM '
-                        'CDC serial interface.')
+@dfu.command(short_help='Update the firmware on a device over a SPI bus connection. The DFU '
+                        'target must be a chip with SPI pins and one GPIO output line)
 @click.option('-pkg', '--package',
               help='Filename of the DFU package.',
               type=click.Path(exists=True, resolve_path=True, file_okay=True, dir_okay=False),
               required=True)
 @click.option('-bus',
-              help='SPI bus to which the device is connected. (e.g. COM1 in windows systems, /dev/ttyACM0 in linux/mac)',
+              help='SPI bus to which the device is connected. (e.g. 0 == /dev/spidev0.* in linux/mac)',
               type=click.INT,
               required = True)
 @click.option('-dev',
-              help='Serial number of the device. Ignored if --port is set.',
+              help='Number of device on SPI bus. (e.g 0 == /dev/spidev*.0 in linux/mac)',
               type=click.INT,
               required=True)
 @click.option('-cd', '--connect-delay',
