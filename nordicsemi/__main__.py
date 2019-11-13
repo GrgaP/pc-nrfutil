@@ -34,6 +34,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
+
 import ipaddress
 import signal
 
@@ -956,13 +957,13 @@ def do_serial(package, port, connect_delay, flow_control, packet_receipt_notific
 def do_spi(package, bus, dev, connect_delay, packet_receipt_notification, timeout):
 
     if packet_receipt_notification is None:
-        packet_receipt_notification = DfuTransportSerial.DEFAULT_PRN
+        packet_receipt_notification = DfuTransportSPI.DEFAULT_PRN
     if bus is None:
         bus = 1
     if dev is None:
         dev = 0
     if timeout is None:
-        timeout = DfuTransportSerial.DEFAULT_TIMEOUT
+        timeout = DfuTransportSPI.DEFAULT_TIMEOUT
 
     #logger.info("Using board at SPI: {}".format(port))
     spi_backend = DfuTransportSPI(bus=bus, dev=dev, prn=packet_receipt_notification, timeout=timeout)
@@ -980,46 +981,46 @@ def do_spi(package, bus, dev, connect_delay, packet_receipt_notification, timeou
 
     click.echo("Device programmed.")
 
-#@dfu.command(short_help='Update the firmware on a device over a USB serial connection. The DFU '
-#                        'target must be a chip with USB pins (i.e. nRF52840) and provide a USB ACM '
-#                        'CDC serial interface.')
-#@click.option('-pkg', '--package',
-#              help='Filename of the DFU package.',
-#              type=click.Path(exists=True, resolve_path=True, file_okay=True, dir_okay=False),
-#              required=True)
-#@click.option('-p', '--port',
-#              help='Serial port address to which the device is connected. (e.g. COM1 in windows systems, /dev/ttyACM0 in linux/mac)',
-#              type=click.STRING,
-#              cls = OptionRequiredIf)
-#@click.option('-cd', '--connect-delay',
-#              help='Delay in seconds before each connection to the target device during DFU. Default is 3.',
-#              type=click.INT,
-#              required=False)
-#@click.option('-fc', '--flow-control',
-#              help='To enable flow control set this flag to 1',
-#              type=click.BOOL,
-#              required=False)
-#@click.option('-prn', '--packet-receipt-notification',
-#              help='Set the packet receipt notification value',
-#              type=click.INT,
-#              required=False)
-#@click.option('-b', '--baud-rate',
-#              help='Set the baud rate',
-#              type=click.INT,
-#              required=False)
-#@click.option('-snr', '--serial-number',
-#              help='Serial number of the device. Ignored if --port is set.',
-#              type=click.STRING,
-#              required=False)
-#@click.option('-t', '--timeout',
-#              help='Set the timeout in seconds for board to respond (default: 30 seconds)',
-#              type=click.INT,
-#              required=False)
-#def usb_serial(package, port, connect_delay, flow_control, packet_receipt_notification, baud_rate, serial_number,
-#               timeout):
-#    """Perform a Device Firmware Update on a device with a bootloader that supports USB serial DFU."""
-#    do_serial(package, port, connect_delay, flow_control, packet_receipt_notification, baud_rate, serial_number, False,
-#              timeout)
+@dfu.command(short_help='Update the firmware on a device over a USB serial connection. The DFU '
+                        'target must be a chip with USB pins (i.e. nRF52840) and provide a USB ACM '
+                        'CDC serial interface.')
+@click.option('-pkg', '--package',
+              help='Filename of the DFU package.',
+              type=click.Path(exists=True, resolve_path=True, file_okay=True, dir_okay=False),
+              required=True)
+@click.option('-p', '--port',
+              help='Serial port address to which the device is connected. (e.g. COM1 in windows systems, /dev/ttyACM0 in linux/mac)',
+              type=click.STRING,
+              cls = OptionRequiredIf)
+@click.option('-cd', '--connect-delay',
+              help='Delay in seconds before each connection to the target device during DFU. Default is 3.',
+              type=click.INT,
+              required=False)
+@click.option('-fc', '--flow-control',
+              help='To enable flow control set this flag to 1',
+              type=click.BOOL,
+              required=False)
+@click.option('-prn', '--packet-receipt-notification',
+              help='Set the packet receipt notification value',
+              type=click.INT,
+              required=False)
+@click.option('-b', '--baud-rate',
+              help='Set the baud rate',
+              type=click.INT,
+              required=False)
+@click.option('-snr', '--serial-number',
+              help='Serial number of the device. Ignored if --port is set.',
+              type=click.STRING,
+              required=False)
+@click.option('-t', '--timeout',
+              help='Set the timeout in seconds for board to respond (default: 30 seconds)',
+              type=click.INT,
+              required=False)
+def usb_serial(package, port, connect_delay, flow_control, packet_receipt_notification, baud_rate, serial_number,
+               timeout):
+    """Perform a Device Firmware Update on a device with a bootloader that supports USB serial DFU."""
+    do_serial(package, port, connect_delay, flow_control, packet_receipt_notification, baud_rate, serial_number, False,
+              timeout)
 
 @dfu.command(short_help='Update the firmware on a device over a USB serial connection. The DFU '
                         'target must be a chip with USB pins (i.e. nRF52840) and provide a USB ACM '
@@ -1048,7 +1049,7 @@ def do_spi(package, bus, dev, connect_delay, packet_receipt_notification, timeou
               help='Set the timeout in seconds for board to respond (default: 30 seconds)',
               type=click.INT,
               required=False)
-def usb_serial(package, bus, dev, connect_delay, packet_receipt_notification, timeout):
+def spi(package, bus, dev, connect_delay, packet_receipt_notification, timeout):
     """Perform a Device Firmware Update on a device with a bootloader that supports SPI serial DFU."""
     do_spi(package, bus, dev, connect_delay, packet_receipt_notification, timeout)
 
