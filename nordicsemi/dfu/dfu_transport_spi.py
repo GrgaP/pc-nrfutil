@@ -36,6 +36,8 @@
 #
 
 # Python imports
+import os
+import select
 import time
 from datetime import datetime, timedelta
 import binascii
@@ -48,6 +50,8 @@ import struct
 import spidev
 
 # Nordic Semiconductor imports
+from serial import SerialException
+
 from nordicsemi.dfu.dfu_transport   import DfuTransport, DfuEvent, TRANSPORT_LOGGING_LEVEL
 from pc_ble_driver_py.exceptions    import NordicSemiException
 from nordicsemi.lister.device_lister import DeviceLister
@@ -113,9 +117,26 @@ class Slip:
 
         return (finished, current_state, decoded_data)
 
+
 class DFUAdapter:
-    def __init__(self, spi):
+    def __init__(self, spi, slave_int_gpio):
         self.spi = spi
+        self.gpio_path = f"/sys/class/gpio/gpio{slave_int_gpio}"
+        self.gpio_value_file = self.gpio_path + "/value"
+
+        if not os.path.exists(self.gpio_path):
+            with open("/sys/class/gpio/export", "w") as f:
+                f.write(str(slave_int_gpio))
+            # let some time for gpio initializing
+            time.sleep(1)
+
+        # set gpio as input
+        with open(self.gpio_path + "/direction", "w") as f:
+            f.write("in")
+
+        # allow interrupts
+        with open(self.gpio_path + "/edge", "w") as f:
+            f.write("both")
 
     def send_message(self, data):
         packet = Slip.encode(data)
@@ -135,6 +156,7 @@ class DFUAdapter:
         finished = False
         decoded_data = []
 
+        self.__wait_gpio_state(0)
         bytes = self.spi.readbytes(16)
         print(f'response: {bytes}\n')
 
@@ -150,6 +172,19 @@ class DFUAdapter:
         else:
             current_state = Slip.SLIP_STATE_CLEARING_INVALID_PACKET
             return None
+
+    def __wait_gpio_state(self, expected_state, timeout=15):
+        with open(self.gpio_value_file, "r") as f:
+            po = select.epoll()
+            po.register(f.fileno(), select.EPOLLPRI | select.EPOLLERR)
+
+            val = None
+            while val != expected_state:
+                print("polling...")
+                po.poll(timeout)
+                f.seek(0)
+                val = int(f.read(1))
+                print(f"read state {val}")
 
 class DfuTransportSPI(DfuTransport):
 
@@ -172,7 +207,8 @@ class DfuTransportSPI(DfuTransport):
 
     def __init__(self,
                  bus,
-                 dev,                 
+                 dev,
+                 slave_int_gpio,
                  timeout=DEFAULT_TIMEOUT,
                  prn=DEFAULT_PRN):
 
@@ -182,6 +218,7 @@ class DfuTransportSPI(DfuTransport):
         self.timeout = timeout
         self.prn         = prn
         self.dfu_adapter = None
+        self.slave_int_gpio = slave_int_gpio
 
     def open(self):
         super().open()
@@ -190,7 +227,7 @@ class DfuTransportSPI(DfuTransport):
             self.spi = spidev.SpiDev()
             self.spi.open(self.bus, self.dev)
             self.spi.max_speed_hz=100000
-            self.dfu_adapter = DFUAdapter(self.spi)
+            self.dfu_adapter = DFUAdapter(self.spi, self.slave_int_gpio)
         except Exception as e:
             raise NordicSemiException("SPI bus could not be opened on {0}"
               ". Reason: {1}".format(self.com_port, e.strerror))
@@ -341,12 +378,10 @@ class DfuTransportSPI(DfuTransport):
         logger.debug("Serial: Set Packet Receipt Notification {}".format(self.prn))
         self.dfu_adapter.send_message([DfuTransportSPI.OP_CODE['SetPRN']]
             + list(struct.pack('<H', self.prn)))
-        time.sleep(400/self.spi.max_speed_hz)
         self.__get_response(DfuTransportSPI.OP_CODE['SetPRN'])
 
     def __get_mtu(self):
         self.dfu_adapter.send_message([DfuTransportSPI.OP_CODE['GetSerialMTU']])
-        time.sleep(300/self.spi.max_speed_hz)
         response = self.__get_response(DfuTransportSPI.OP_CODE['GetSerialMTU'])
 
         self.mtu = struct.unpack('<H', bytearray(response))[0]
@@ -388,12 +423,10 @@ class DfuTransportSPI(DfuTransport):
     def __create_object(self, object_type, size):
         self.dfu_adapter.send_message([DfuTransportSPI.OP_CODE['CreateObject'], object_type]\
                                             + list(struct.pack('<L', size)))
-        time.sleep(10000/self.spi.max_speed_hz)
         self.__get_response(DfuTransportSPI.OP_CODE['CreateObject'])
 
     def __calculate_checksum(self):
         self.dfu_adapter.send_message([DfuTransportSPI.OP_CODE['CalcChecSum']])
-        time.sleep(2000/self.spi.max_speed_hz)
         response = self.__get_response(DfuTransportSPI.OP_CODE['CalcChecSum'])
 
         if response is None:
@@ -406,7 +439,6 @@ class DfuTransportSPI(DfuTransport):
 
     def __execute(self):
         self.dfu_adapter.send_message([DfuTransportSPI.OP_CODE['Execute']])
-        time.sleep(20000/self.spi.max_speed_hz)
         self.__get_response(DfuTransportSPI.OP_CODE['Execute'])
 
     def __select_command(self):
@@ -418,7 +450,6 @@ class DfuTransportSPI(DfuTransport):
     def __select_object(self, object_type):
         logger.debug("Serial: Selecting Object: type:{}".format(object_type))
         self.dfu_adapter.send_message([DfuTransportSPI.OP_CODE['ReadObject'], object_type])
-        time.sleep(300/self.spi.max_speed_hz)
         response = self.__get_response(DfuTransportSPI.OP_CODE['ReadObject'])
         (max_size, offset, crc)= struct.unpack('<III', bytearray(response))
 
@@ -459,7 +490,6 @@ class DfuTransportSPI(DfuTransport):
             current_pnr    += 1
             if self.prn == current_pnr:
                 current_pnr = 0
-                time.sleep(2000/self.spi.max_speed_hz)
                 response    = self.__get_checksum_response()
                 validate_crc()
         response = self.__calculate_checksum()

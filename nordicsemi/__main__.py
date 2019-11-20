@@ -954,7 +954,7 @@ def do_serial(package, port, connect_delay, flow_control, packet_receipt_notific
 
     click.echo("Device programmed.")
 
-def do_spi(package, bus, dev, connect_delay, packet_receipt_notification, timeout):
+def do_spi(package, bus, dev, slave_int_gpio, connect_delay, packet_receipt_notification, timeout):
 
     if packet_receipt_notification is None:
         packet_receipt_notification = DfuTransportSPI.DEFAULT_PRN
@@ -966,7 +966,11 @@ def do_spi(package, bus, dev, connect_delay, packet_receipt_notification, timeou
         timeout = DfuTransportSPI.DEFAULT_TIMEOUT
 
     #logger.info("Using board at SPI: {}".format(port))
-    spi_backend = DfuTransportSPI(bus=bus, dev=dev, prn=packet_receipt_notification, timeout=timeout)
+    spi_backend = DfuTransportSPI(
+        bus=bus, dev=dev, slave_int_gpio=slave_int_gpio,
+        prn=packet_receipt_notification,
+        timeout=timeout
+    )
     spi_backend.register_events_callback(DfuEvent.PROGRESS_EVENT, update_progress)
 
     dfu = Dfu(zip_file_path = package, dfu_transport = spi_backend, connect_delay = connect_delay)
@@ -1023,7 +1027,7 @@ def usb_serial(package, port, connect_delay, flow_control, packet_receipt_notifi
               timeout)
 
 @dfu.command(short_help='Update the firmware on a device over a SPI bus connection. The DFU '
-                        'target must be a chip with SPI pins and one GPIO output line)
+                        'target must be a chip with SPI pins and one GPIO output line')
 @click.option('-pkg', '--package',
               help='Filename of the DFU package.',
               type=click.Path(exists=True, resolve_path=True, file_okay=True, dir_okay=False),
@@ -1034,6 +1038,10 @@ def usb_serial(package, port, connect_delay, flow_control, packet_receipt_notifi
               required = True)
 @click.option('-dev',
               help='Number of device on SPI bus. (e.g 0 == /dev/spidev*.0 in linux/mac)',
+              type=click.INT,
+              required=True)
+@click.option('-sint',
+              help="GPIO number is connected to device's interrupt line.",
               type=click.INT,
               required=True)
 @click.option('-cd', '--connect-delay',
@@ -1048,9 +1056,9 @@ def usb_serial(package, port, connect_delay, flow_control, packet_receipt_notifi
               help='Set the timeout in seconds for board to respond (default: 30 seconds)',
               type=click.INT,
               required=False)
-def spi(package, bus, dev, connect_delay, packet_receipt_notification, timeout):
+def spi(package, bus, dev, sint, connect_delay, packet_receipt_notification, timeout):
     """Perform a Device Firmware Update on a device with a bootloader that supports SPI serial DFU."""
-    do_spi(package, bus, dev, connect_delay, packet_receipt_notification, timeout)
+    do_spi(package, bus, dev, sint, connect_delay, packet_receipt_notification, timeout)
 
 @dfu.command(short_help="Update the firmware on a device over a UART serial connection. The DFU target must be a chip using digital I/O pins as an UART.")
 @click.option('-pkg', '--package',
