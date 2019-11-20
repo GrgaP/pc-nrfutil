@@ -157,14 +157,16 @@ class DFUAdapter:
         decoded_data = []
 
         self.__wait_gpio_state(0)
-        bytes = self.spi.readbytes(16)
+        bytes = self.spi.readbytes(17)
         print(f'response: {bytes}\n')
 
         if bytes[0]:
-            for byte_i in bytes:
-                if byte_i < 255:         
+            for i in range(0, len(bytes)):
+                if (bytes[i] == 192) and (bytes[i+1] == 255): 
+                    break
+                else:        
                     (finished, current_state, decoded_data) \
-                    = Slip.decode_add_byte(byte_i, decoded_data, current_state)
+                    = Slip.decode_add_byte(bytes[i], decoded_data, current_state)
 
             logger.log(TRANSPORT_LOGGING_LEVEL, 'SLIP: <-- ' + str(decoded_data))
             print(f'decoded_data: {decoded_data}\n')
